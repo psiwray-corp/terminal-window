@@ -36,6 +36,10 @@ Only the tagged commit contains the non-snapshot version. The next commit
 restores the snapshot. The next minor version is `2.1.0-SNAPSHOT`, not
 `3.0.0-SNAPSHOT`; `3.0.0` is reserved for a deliberate breaking release.
 
+Release branches are never merged back into `master`. Development continues
+on `master`; release branches remain only as maintenance targets for
+cherry-picked hotfixes.
+
 ## Before starting
 
 Use JDK 25, a clean release branch, and a working GnuPG keyring. The public key
@@ -58,7 +62,19 @@ today’s UTC date. `release-prepare.sh` derives the next patch snapshot
 
 ## Git helper scripts
 
-Three scripts handle the branch, commits, and tag:
+Use the one-shot normal-release script:
+
+```bash
+scripts/release.sh "$VERSION"               # all branch/commit/tag/master work
+scripts/release.sh "$VERSION" --dry-run
+scripts/release.sh "$VERSION" --master-next # master bump for an already-cut release
+```
+
+It creates `release/<major.minor>`, makes the release commit, creates the
+signed tag, makes the next-patch snapshot commit, moves `master` to the next
+minor snapshot, and checks out the release tag for building.
+
+Lower-level helpers remain available:
 
 ```bash
 scripts/release-branch.sh "$VERSION"             # create or switch release/<major.minor>
@@ -71,57 +87,54 @@ scripts/release-tag.sh "$VERSION" --push         # also push the tag
 
 All accept `--dry-run`; use it to inspect the Git commands without changing the
 repository. `release-branch.sh` may be used with uncommitted release-candidate
-changes; `release-prepare.sh` and `release-tag.sh` require a clean worktree.
-`release-prepare.sh` commits with `git commit -S`; the GPG passphrase is entered
-manually.
+changes; `release-prepare.sh`, `release-tag.sh`, and `release.sh` require a
+clean worktree. Signed commits use `git commit -S`; the GPG passphrase is
+entered manually.
 
 ## Normal release
 
-### 1. Create the release branch
+### 1. Commit the release changelog
 
-For a new major/minor line, branch from `master` while it is still the
-`X.Y.0-SNAPSHOT` version:
+On `master`, move the `[Unreleased]` changelog entries under a heading for this
+release, leave a new empty `## [Unreleased]` section, and commit the change:
 
 ```bash
 git switch master
 git pull --ff-only
-scripts/release-branch.sh "$VERSION"
+# Edit CHANGELOG.md.
+git add CHANGELOG.md
+git commit -S -m "Release notes for $VERSION"
 ```
 
-The release branch must start from `${VERSION}-SNAPSHOT`. A release branch
-never starts at the non-snapshot version. `scripts/release-branch.sh` enforces
-this check when it creates a branch.
+The one-shot release script requires this committed changelog heading.
 
-### 2. Prepare the changelog and release commits
-
-Move the `[Unreleased]` changelog entries under a heading for this release and
-commit that changelog change on the release branch. Leave a new, empty
-`## [Unreleased]` section for the next cycle.
-
-Then run:
+### 2. Run the one-shot preparation
 
 ```bash
-scripts/release-prepare.sh "$VERSION"
+scripts/release.sh "$VERSION"
 ```
 
 The script performs, in order:
 
-1. `2.0.0-SNAPSHOT` -> signed commit `Release 2.0.0`
-2. signed tag `v2.0.0` at that commit
-3. `2.0.0` -> signed commit `Prepare next development iteration 2.0.1-SNAPSHOT`
+1. create `release/<major.minor>` from `master`
+2. `2.0.0-SNAPSHOT` -> signed commit `Release 2.0.0`
+3. signed tag `v2.0.0`
+4. `2.0.0` -> signed commit `Next development version 2.0.1-SNAPSHOT.`
+5. `master` -> signed commit `Next development version 2.1.0-SNAPSHOT.`
+6. check out `v2.0.0`
 
-The release branch is left on `2.0.1-SNAPSHOT`; the tag points at the only
-commit containing `2.0.0`. Preview the sequence with:
+The release branch is left at `2.0.1-SNAPSHOT`; `master` is at
+`2.1.0-SNAPSHOT`; the tag is the only commit containing `2.0.0`. Preview with:
 
 ```bash
-scripts/release-prepare.sh "$VERSION" --dry-run
+scripts/release.sh "$VERSION" --dry-run
 ```
 
 ### 3. Build from the tag
 
-```bash
-git switch --detach "$TAG"
+The one-shot script already checked out the tag:
 
+```bash
 ./gradlew --no-daemon clean check
 xvfb-run -a ./gradlew --no-daemon integrationTest
 ./gradlew --no-daemon dokkaGenerate
@@ -135,7 +148,7 @@ SIGNING_PUBLIC_KEY_FILE="$PUBLIC_KEY_FILE" \
 The last two commands prompt for the GPG passphrase. Verify that the local
 repository contains the JAR, sources, Dokka Javadoc, POM, module metadata, one
 `.asc` per file, and checksums. If a gate fails, delete the local tag and
-repeat from step 2.
+repeat.
 
 ### 4. Publish to the Central Portal
 
@@ -167,34 +180,25 @@ curl -fsSL \
 
 git switch "$RELEASE_BRANCH"
 git push origin "$RELEASE_BRANCH" "$TAG"
+git push forgejo "$RELEASE_BRANCH" "$TAG"
+
+git switch master
+git push origin master
+git push forgejo master
 ```
 
 Also resolve the version from a clean consumer project and check the Central
 artifact page. A failed resolution is not fixed by re-uploading the same
 version; publish the next patch version.
 
-### 6. Move master to the next snapshot
-
-Merge the release line back so `master` has the release commit and snapshot
-commit, then set its next development version:
-
-```bash
-git switch master
-git merge --no-ff "$RELEASE_BRANCH" \
-  -m "Merge $RELEASE_BRANCH after $VERSION"
-sed -i -E "s/^version=.*/version=${NEXT_MINOR}/" gradle.properties
-git add gradle.properties
-git commit -S -m "Prepare next development iteration $NEXT_MINOR"
-git push origin master
-```
-
-After 2.0.0, `master` is `2.1.0-SNAPSHOT` and `release/2.0` is
-`2.0.1-SNAPSHOT`.
+The release branch is not merged back. After 2.0.0, `master` is
+`2.1.0-SNAPSHOT` and `release/2.0` is `2.0.1-SNAPSHOT`.
 
 ## Hotfix
 
-A hotfix bumps only the third version element and runs on the existing release
-branch.
+A hotfix bumps only the third version element. The fix lands on `master`
+first and is cherry-picked to the release branch; release branches are never
+merged back into `master`.
 
 ```bash
 export VERSION=2.0.1
@@ -202,11 +206,11 @@ export RELEASE_BRANCH=release/2.0
 export TAG="v$VERSION"
 export DATE="$(date -u +%F)"
 
-git switch "$RELEASE_BRANCH"
+git switch master
 git pull --ff-only
 ```
 
-### 1. Commit the fix without changing the version
+### 1. Commit the fix on master
 
 ```bash
 # Make and test the fix.
@@ -215,16 +219,24 @@ git commit -S -m "Fix <issue>"
 export FIX_COMMIT="$(git rev-parse HEAD)"
 ```
 
-### 2. Prepare and build the patch release
+### 2. Cherry-pick the fix to the release branch
 
-Add the hotfix entry under a new `## [$VERSION] - $DATE` heading and commit it.
-Then let the preparation script create the release commit, tag, and next patch
-snapshot commit:
+```bash
+git switch "$RELEASE_BRANCH"
+git pull --ff-only
+git cherry-pick -S "$FIX_COMMIT"
+```
+
+Add the hotfix entry under a new `## [$VERSION] - $DATE` heading and commit it:
 
 ```bash
 git add CHANGELOG.md
 git commit -S -m "Add $VERSION changelog"
+```
 
+### 3. Prepare and build the patch release
+
+```bash
 scripts/release-prepare.sh "$VERSION"
 git switch --detach "$TAG"
 
@@ -246,17 +258,7 @@ git switch "$RELEASE_BRANCH"
 git push origin "$RELEASE_BRANCH" "$TAG"
 ```
 
-### 3. Bring the fix to master
-
-Do not merge the release branch wholesale into `master`; that would overwrite
-master’s newer snapshot version. Cherry-pick only the fix commit:
-
-```bash
-git switch master
-git pull --ff-only
-git cherry-pick "$FIX_COMMIT"
-git push origin master
-```
+`master` already contains the fix; no merge or backport is needed.
 
 ## Failure and recovery rules
 
