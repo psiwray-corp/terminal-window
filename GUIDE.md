@@ -161,6 +161,6 @@ graph TD
 - [x] 20 Performance verification
 - [x] 21 Documentation set
 - [x] 22 GPG signing
-- [ ] 23 Maven Central publishing
-- [ ] 24 Release runbook
+- [x] 23 Maven Central publishing
+- [x] 24 Release runbook
 - [x] 25 Window cursor & icon customization

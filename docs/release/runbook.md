@@ -271,3 +271,5 @@ git push origin "$RELEASE_BRANCH" "$TAG"
   never released. Central versions are immutable.
 - Never put the GPG passphrase, Portal token, or `SIGNING_*` values in the
   repository or in a workflow.
+
+See [rollback.md](rollback.md) for discard-versus-next-version recovery.
