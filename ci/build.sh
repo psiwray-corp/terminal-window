@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+bash ci/check-docs.sh
+
+exec ./gradlew --no-daemon --stacktrace \
+    spotlessCheck \
+    test \
+    :examples:build \
+    :benchmarks:build \
+    dokkaGenerate \
+    publishToMavenLocal

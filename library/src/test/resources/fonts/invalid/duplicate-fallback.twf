@@ -1,0 +1,6 @@
+// duplicate fallback
+version 1
+cell-width 8
+cell-height 16
+fallback U+003F
+fallback U+0041

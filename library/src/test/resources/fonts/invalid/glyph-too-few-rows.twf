@@ -1,0 +1,8 @@
+// too few rows
+version 1
+cell-width 8
+cell-height 16
+
+glyph U+0041
+........
+glyph U+0042
