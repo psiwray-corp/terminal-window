@@ -456,6 +456,13 @@ class TerminalWindowServiceTest {
 
         override fun cursorPosition(window: Long): CursorSample = unsupported()
 
+        override fun getClipboardString(window: Long): String? = unsupported()
+
+        override fun setClipboardString(
+            window: Long,
+            text: String,
+        ): Unit = unsupported()
+
         private fun unsupported(): Nothing = error("FakeBackend does not create windows")
     }
 }

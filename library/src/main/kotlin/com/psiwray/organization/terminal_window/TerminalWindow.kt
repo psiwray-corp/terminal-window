@@ -1,6 +1,7 @@
 package com.psiwray.organization.terminal_window
 
 import com.psiwray.organization.terminal_window.font.BitmapFont
+import com.psiwray.organization.terminal_window.input.ClipboardListener
 import com.psiwray.organization.terminal_window.input.CursorPosition
 import com.psiwray.organization.terminal_window.input.InputListener
 import com.psiwray.organization.terminal_window.input.Key
@@ -30,15 +31,17 @@ import com.psiwray.organization.terminal_window.internal.WindowHandle
  * destruction when called from a non-service thread.
  *
  * Thread affinity:
- * - Service thread: [frame], [acquireContext], [releaseContext], and [close]
- *   when the service thread owns the context.
+ * - Service thread: [frame], [acquireContext], [releaseContext], [clipboardText],
+ *   and [close] when the service thread owns the context.
  * - Owner thread: [matrix] writes, [forceRepaint], [frame], and context
  *   release/acquire.
  * - Any thread: [setTitle], [setCursor], [setCursorVisible], [setCursorMode],
  *   [setIcon], [clearIcon], [addInputListener], [removeInputListener],
- *   [isKeyPressed], [isMouseButtonPressed], [cursorPosition], [renderStats],
- *   [requestRepaint], [requestClose], [setCloseRequested], [setVisible],
- *   [setResizable], [shouldClose], [droppedEvents], and [awaitClosed].
+ *   [setClipboardText], [requestClipboardText], [addClipboardListener],
+ *   [removeClipboardListener], [isKeyPressed], [isMouseButtonPressed],
+ *   [cursorPosition], [renderStats], [requestRepaint], [requestClose],
+ *   [setCloseRequested], [setVisible], [setResizable], [shouldClose],
+ *   [droppedEvents], and [awaitClosed].
  * @since 2.0.0
  */
 public class TerminalWindow internal constructor(
@@ -145,6 +148,80 @@ public class TerminalWindow internal constructor(
      * @since 2.0.0
      */
     public fun cursorPosition(): CursorPosition = handle.cursorPositionSnapshot()
+
+    /**
+     * Replaces the system clipboard with [text].
+     *
+     * The text is written through GLFW as UTF-8 and must not contain NUL.
+     * On the service thread the clipboard is updated immediately; from any
+     * other thread the write is queued to the service thread and applied
+     * before its next poll. Plain text only: no rich text, images, or primary
+     * selection.
+     *
+     * @throws IllegalArgumentException if [text] contains a NUL character.
+     * @throws IllegalStateException if this window is closed.
+     * @since 2.1.0
+     */
+    public fun setClipboardText(text: String) {
+        handle.setClipboardText(text)
+    }
+
+    /**
+     * Reads the current clipboard text.
+     *
+     * GLFW clipboard reads are main-thread-only, so this method must run on the
+     * service thread. It returns `null` when the clipboard holds no text or its
+     * contents cannot be converted to UTF-8 text, and may block briefly on X11
+     * while the selection owner responds.
+     *
+     * From any other thread, use [requestClipboardText] and a
+     * [ClipboardListener]; the result is delivered on the window owner thread.
+     *
+     * @throws IllegalStateException if this window is closed or the caller is
+     *   not the service thread.
+     * @since 2.1.0
+     */
+    public fun clipboardText(): String? = handle.clipboardText()
+
+    /**
+     * Requests one asynchronous clipboard read.
+     *
+     * The read runs on the service thread: immediately when called there,
+     * otherwise before the next service poll. Its result is delivered to
+     * clipboard listeners on the window owner thread when the frame pipeline
+     * drains input. Register the listener before requesting.
+     *
+     * Requests are never coalesced or dropped, but no frame means no delivery:
+     * the result waits until the owner thread drains input.
+     *
+     * @throws IllegalStateException if this window is closed.
+     * @since 2.1.0
+     */
+    public fun requestClipboardText() {
+        handle.requestClipboardText()
+    }
+
+    /**
+     * Registers [listener] to receive clipboard reads on the window owner thread.
+     *
+     * See [ClipboardListener] for delivery ordering and the `null` result.
+     *
+     * @throws IllegalStateException if this window is closed.
+     * @since 2.1.0
+     */
+    public fun addClipboardListener(listener: ClipboardListener) {
+        handle.addClipboardListener(listener)
+    }
+
+    /**
+     * Removes [listener]; no further clipboard reads are delivered to it.
+     *
+     * @throws IllegalStateException if this window is closed.
+     * @since 2.1.0
+     */
+    public fun removeClipboardListener(listener: ClipboardListener) {
+        handle.removeClipboardListener(listener)
+    }
 
     /**
      * Runs one frame opportunity.

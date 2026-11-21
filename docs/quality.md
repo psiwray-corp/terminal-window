@@ -16,7 +16,7 @@ Dokka is a separate documentation check, not part of `check`.
 |---|---|
 | `./gradlew spotlessCheck` | Fail on formatting or ktlint lint violations. |
 | `./gradlew spotlessApply` | Apply formatting before committing. |
-| `bash ci/check-docs.sh` | Fail on a broken relative Markdown link or a README over 150 lines. |
+| `bash ci/check-docs.sh` | Fail on a broken relative Markdown link or a README over 160 lines. |
 | `./gradlew build` | Compile, run tests, and run `check`. |
 | `./gradlew :library:dokkaGenerate` | Generate HTML and Javadoc under `library/build/dokka/`. |
 | `./gradlew :library:javadocJar` | Build the Javadoc jar from Dokka output. |

@@ -199,6 +199,28 @@ internal object NativeGlfwBackend : GlfwBackend {
         }
     }
 
+    override fun getClipboardString(window: Long): String? {
+        val text = GLFW.glfwGetClipboardString(window)
+        if (text != null) {
+            return text
+        }
+        // GLFW reports GLFW_FORMAT_UNAVAILABLE when the clipboard is empty or
+        // cannot be converted to UTF-8. That is a normal "no text" result, not a
+        // service failure, so it must not surface from the next pump.
+        val error = takeError()
+        if (error != null && error.code != GLFW.GLFW_FORMAT_UNAVAILABLE) {
+            throw error.asException()
+        }
+        return null
+    }
+
+    override fun setClipboardString(
+        window: Long,
+        text: String,
+    ) {
+        GLFW.glfwSetClipboardString(window, text)
+    }
+
     override fun createStandardCursor(shape: Int): Long = GLFW.glfwCreateStandardCursor(shape)
 
     override fun createCursor(

@@ -1,6 +1,7 @@
 package com.psiwray.organization.terminal_window.internal
 
 import com.psiwray.organization.terminal_window.input.CharEvent
+import com.psiwray.organization.terminal_window.input.ClipboardListener
 import com.psiwray.organization.terminal_window.input.CloseRequestedEvent
 import com.psiwray.organization.terminal_window.input.ContentScaleEvent
 import com.psiwray.organization.terminal_window.input.CursorEnterEvent
@@ -13,6 +14,7 @@ import com.psiwray.organization.terminal_window.input.MouseMoveEvent
 import com.psiwray.organization.terminal_window.input.ResizeEvent
 import com.psiwray.organization.terminal_window.input.ScrollEvent
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -24,7 +26,8 @@ import java.util.concurrent.atomic.AtomicReference
  * window-state events are coalesced in dedicated slots: only the newest value
  * is delivered, and these values are never dropped. State slots are delivered
  * after the discrete queue, in cursor, enter/leave, resize, content-scale, focus, close
- * order. All dispatch happens on the owner thread in [drain].
+ * order. Completed clipboard reads are delivered after the state slots. All
+ * dispatch happens on the owner thread in [drain].
  */
 internal class InputQueue {
     private val events: ArrayBlockingQueue<InputEvent> = ArrayBlockingQueue(CAPACITY)
@@ -36,6 +39,16 @@ internal class InputQueue {
     private val latestClose: AtomicReference<CloseRequestedEvent?> = AtomicReference(null)
     private val dropped: AtomicInteger = AtomicInteger(0)
     private val listeners: CopyOnWriteArrayList<InputListener> = CopyOnWriteArrayList()
+
+    /**
+     * Completed clipboard reads waiting for the owner thread.
+     *
+     * Request-driven and low-frequency, so the queue is unbounded and results
+     * are never coalesced or dropped: every request produces exactly one
+     * delivery.
+     */
+    private val clipboardResults: ConcurrentLinkedQueue<ClipboardResult> = ConcurrentLinkedQueue()
+    private val clipboardListeners: CopyOnWriteArrayList<ClipboardListener> = CopyOnWriteArrayList()
 
     /** Number of discrete events dropped because the queue was full. */
     internal val droppedEvents: Int
@@ -49,6 +62,16 @@ internal class InputQueue {
     /** Removes [listener]; a listener already being dispatched is unaffected. */
     internal fun removeListener(listener: InputListener) {
         listeners.remove(listener)
+    }
+
+    /** Registers [listener] for clipboard results on the owner thread. */
+    internal fun addClipboardListener(listener: ClipboardListener) {
+        clipboardListeners.addIfAbsent(listener)
+    }
+
+    /** Removes [listener]; results already queued for another listener are unaffected. */
+    internal fun removeClipboardListener(listener: ClipboardListener) {
+        clipboardListeners.remove(listener)
     }
 
     /**
@@ -93,6 +116,16 @@ internal class InputQueue {
     }
 
     /**
+     * Records one completed clipboard read for owner-thread delivery.
+     *
+     * Never blocks and never runs user code. A `null` [text] means the
+     * clipboard held no text.
+     */
+    internal fun offerClipboardText(text: String?) {
+        clipboardResults.add(ClipboardResult(text))
+    }
+
+    /**
      * Drains pending events to registered listeners.
      *
      * Call only on the window owner thread. The listener list is a
@@ -129,11 +162,19 @@ internal class InputQueue {
         if (close != null) {
             dispatch(close)
         }
+
+        while (true) {
+            val result = clipboardResults.poll() ?: break
+            for (listener in clipboardListeners) {
+                listener.onClipboardText(result.text)
+            }
+        }
     }
 
     /** Discards pending events; used when the native window is destroyed. */
     internal fun clear() {
         events.clear()
+        clipboardResults.clear()
         latestMove.set(null)
         latestCursorEnter.set(null)
         latestResize.set(null)
@@ -158,6 +199,11 @@ internal class InputQueue {
             }
         }
     }
+
+    /** Queue element for a completed read; [ConcurrentLinkedQueue] rejects `null` elements. */
+    private class ClipboardResult(
+        val text: String?,
+    )
 
     internal companion object {
         internal const val CAPACITY: Int = 1024

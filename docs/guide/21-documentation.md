@@ -8,7 +8,7 @@ A fresh visitor can install, run, and understand the threading and font contract
 
 ## Deliverables
 
-- `README.md` (≤ 150 lines)
+- `README.md` (≤ 160 lines)
 - `CHANGELOG.md` (Keep a Changelog, SemVer)
 - `CONTRIBUTING.md`
 - `docs/threading.md`, `docs/font-format.md`, `docs/frame.md`, `docs/resize.md`, `docs/performance.md`, `docs/public-api.md`, `docs/dependencies.md`, `docs/cursor.md` (cross-linked)

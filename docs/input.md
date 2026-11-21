@@ -66,6 +66,16 @@ A close request is therefore delivered even when the discrete queue is full.
 Use the event stream for every key transition; direct state cannot reconstruct
 presses that occurred between two polls.
 
+## Clipboard
+
+Clipboard text is not an `InputEvent`: the sealed hierarchy stays closed, so
+adding clipboard state never breaks an exhaustive `when`. `requestClipboardText()`
+triggers one service-thread read, and `ClipboardListener.onClipboardText`
+receives the result on the owner thread after the input events of the same
+drain, in request order. Single-threaded applications can instead read
+synchronously with `TerminalWindow.clipboardText()` on the service thread. See
+[Clipboard](clipboard.md).
+
 ## Close veto
 
 The GLFW close callback sets the cached close flag and enqueues
@@ -152,4 +162,4 @@ Callbacks never throw user exceptions. Listener exceptions propagate from
 ## Related
 
 [Threading](threading.md) · [Frame contract](frame.md) ·
-[Public API](public-api.md)
+[Public API](public-api.md) · [Clipboard](clipboard.md)

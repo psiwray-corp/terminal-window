@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plain-text clipboard access: `TerminalWindow.setClipboardText` writes,
+  `clipboardText` reads on the service thread, and `requestClipboardText` with
+  the new `ClipboardListener` delivers an asynchronous read on the window owner
+  thread. Backed by `glfwSetClipboardString` and `glfwGetClipboardString`; no
+  AWT or platform UI dependency.
+- `docs/clipboard.md` documents the read/write model, delivery order, and
+  platform limits.
+
 ## [2.0.0] - 2026-11-16
 
 ### Added

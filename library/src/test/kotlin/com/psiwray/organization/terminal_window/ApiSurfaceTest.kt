@@ -173,6 +173,7 @@ class ApiSurfaceTest {
                 "com.psiwray.organization.terminal_window.font.BitmapFont",
                 "com.psiwray.organization.terminal_window.font.FontFormatException",
                 "com.psiwray.organization.terminal_window.input.CharEvent",
+                "com.psiwray.organization.terminal_window.input.ClipboardListener",
                 "com.psiwray.organization.terminal_window.input.CloseRequestedEvent",
                 "com.psiwray.organization.terminal_window.input.ContentScaleEvent",
                 "com.psiwray.organization.terminal_window.input.CursorEnterEvent",

@@ -210,6 +210,79 @@ class InputQueueTest {
         assertEquals(emptyList(), recorded.events)
     }
 
+    @Test
+    fun `clipboard results follow input events in request order`() {
+        val queue = InputQueue()
+        val events = RecordingListener()
+        val clipboard = mutableListOf<String?>()
+        queue.addListener(events)
+        queue.addClipboardListener { clipboard.add(it) }
+        val key = KeyEvent(Key.I, 23, KeyAction.PRESS, Modifiers.NONE, repeat = false)
+
+        queue.offer(key)
+        queue.offerClipboardText("first")
+        queue.offerClipboardText(null)
+        queue.offerClipboardText("Grüße 世界 😀")
+        queue.drain()
+
+        assertEquals(listOf<InputEvent>(key), events.events)
+        assertEquals(listOf("first", null, "Grüße 世界 😀"), clipboard)
+    }
+
+    @Test
+    fun `clipboard results are not dropped by a full event queue`() {
+        val queue = InputQueue()
+        val clipboard = mutableListOf<String?>()
+        queue.addClipboardListener { clipboard.add(it) }
+        val event = KeyEvent(Key.J, 36, KeyAction.PRESS, Modifiers.NONE, repeat = false)
+        repeat(InputQueue.CAPACITY + 1) { queue.offer(event) }
+
+        queue.offerClipboardText("paste")
+        queue.drain()
+
+        assertEquals(1, queue.droppedEvents)
+        assertEquals(listOf<String?>("paste"), clipboard)
+    }
+
+    @Test
+    fun `clipboard results go only to listeners registered at drain time`() {
+        val queue = InputQueue()
+        val removed = mutableListOf<String?>()
+        val recorded = mutableListOf<String?>()
+        val listener = ClipboardRecorder(removed)
+        queue.addClipboardListener(listener)
+        queue.addClipboardListener(ClipboardRecorder(recorded))
+
+        queue.offerClipboardText("one")
+        queue.removeClipboardListener(listener)
+        queue.offerClipboardText("two")
+        queue.drain()
+
+        assertEquals(emptyList<String?>(), removed)
+        assertEquals(listOf<String?>("one", "two"), recorded)
+    }
+
+    @Test
+    fun `clipboard results are discarded with the queue`() {
+        val queue = InputQueue()
+        val clipboard = mutableListOf<String?>()
+        queue.addClipboardListener { clipboard.add(it) }
+
+        queue.offerClipboardText("stale")
+        queue.clear()
+        queue.drain()
+
+        assertEquals(emptyList(), clipboard)
+    }
+
+    private class ClipboardRecorder(
+        private val texts: MutableList<String?>,
+    ) : ClipboardListener {
+        override fun onClipboardText(text: String?) {
+            texts.add(text)
+        }
+    }
+
     private class RecordingListener : InputListener {
         val events: MutableList<InputEvent> = mutableListOf()
 

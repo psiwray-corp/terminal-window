@@ -62,16 +62,16 @@ all undecided. Existing `.twf` support should not be removed to make room for
 it. This is a larger change than the title or statistics work and should not be
 treated as a small API addition.
 
-## Clipboard
+## Clipboard — delivered
 
-A future version could offer text clipboard access for copy and paste. The
-useful scope—plain text, selection handling, platform-specific limitations,
-threading, and how it integrates with input events—is undecided.
+`TerminalWindow.setClipboardText`, `clipboardText`, `requestClipboardText`, and
+`ClipboardListener` provide plain-text copy and paste through GLFW's
+`glfwSetClipboardString` and `glfwGetClipboardString` on the service thread. The
+core library still depends on no AWT or platform UI toolkit. See
+[clipboard.md](clipboard.md).
 
-Clipboard behavior differs across X11, Wayland, Windows, and macOS, and may
-require dependencies the current OpenGL-only classpath does not have. Any
-implementation should remain opt-in and must not make the core library depend
-on AWT or platform-specific UI toolkits. It is not committed for v2.1.
+Rich text, images, the X11 primary selection, selection tracking, and clipboard
+history remain out of scope.
 
 ## Terminal emulator companion
 
@@ -149,7 +149,6 @@ measurements:
 - the partial-update data model and its statistics;
 - the title-template grammar and public entry point;
 - the TTF/OTF loading, rasterization, and fallback model;
-- the clipboard API and platform support boundaries;
 - the Vulkan packaging and backend-selection strategy;
 - the emulator's sequence coverage, PTY layer, and input encoding;
 - executable-jar and GraalVM native-image packaging for the emulator;

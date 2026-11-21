@@ -134,7 +134,7 @@ service-thread operations; section 12 supplies the window-specific operations.
 
 | | `stateOps` | `destroyOps` |
 |---|---|---|
-| Purpose | Normal, non-terminal window state: title, cursor, icon, size, visibility, should-close | Window destruction and its context/registry cleanup |
+| Purpose | Normal, non-terminal window state: title, cursor, icon, size, visibility, should-close, queued clipboard writes and reads | Window destruction and its context/registry cleanup |
 | Producers | Any thread, through the service | Any thread, through the service |
 | Consumer | Service thread in `pump()` | Service thread in `pump()` and `close()` |
 | Drain point | Before `destroyOps`, before the GLFW poll | After `stateOps`, before the GLFW poll; also during `close()` |
@@ -213,6 +213,13 @@ functions.
 - The discrete input queue is bounded at 1024 events. Overflow drops the event
   and increments `TerminalWindow.droppedEvents`; cursor movement and the latest
   window-state events are coalesced and are never dropped.
+- `glfwGetClipboardString` and `glfwSetClipboardString` are main-thread-only.
+  `TerminalWindow.clipboardText()` calls the getter directly and therefore
+  requires the service thread; `setClipboardText` and `requestClipboardText`
+  run immediately on the service thread and are queued state operations
+  elsewhere. Completed reads are delivered to `ClipboardListener`s on the owner
+  thread after input events. Clipboard results use their own unbounded,
+  request-driven queue and are never coalesced.
 
 ## Error channel
 
@@ -237,5 +244,5 @@ description pointer is never retained.
 ## Related
 
 [Architecture](architecture.md) · [Frame contract](frame.md) ·
-[Public API](public-api.md) · [Input](input.md) ·
+[Public API](public-api.md) · [Input](input.md) · [Clipboard](clipboard.md) ·
 [Cursor customization](cursor.md)

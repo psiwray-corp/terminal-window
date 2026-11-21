@@ -97,6 +97,9 @@ public fun main() {
   clean, unforced, unrequested frame performs no upload, draw, or swap. See
   [`docs/threading.md`](docs/threading.md) and [`docs/frame.md`](docs/frame.md).
 
+Plain-text clipboard access uses GLFW on the service thread; writes and read
+requests may be queued from any thread. See [`docs/clipboard.md`](docs/clipboard.md).
+
 ## Font format
 
 Fonts are UTF-8 `.twf` v1 text. A glyph is a fixed-size mask where `.` is

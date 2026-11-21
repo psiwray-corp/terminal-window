@@ -16,6 +16,7 @@ import com.psiwray.organization.terminal_window.WindowIcon
 import com.psiwray.organization.terminal_window.font.AtlasBaker
 import com.psiwray.organization.terminal_window.font.BitmapFont
 import com.psiwray.organization.terminal_window.input.CharEvent
+import com.psiwray.organization.terminal_window.input.ClipboardListener
 import com.psiwray.organization.terminal_window.input.CloseRequestedEvent
 import com.psiwray.organization.terminal_window.input.ContentScaleEvent
 import com.psiwray.organization.terminal_window.input.CursorEnterEvent
@@ -361,6 +362,75 @@ internal class WindowHandle private constructor(
                 else -> GLFW.GLFW_CURSOR_NORMAL
             }
         backend.setInputMode(handle, GLFW.GLFW_CURSOR, value)
+    }
+
+    /**
+     * Writes [text] to the clipboard.
+     *
+     * Immediate on the service thread; queued from any other thread. Must be
+     * called after [checkOpen] so a closed window never enqueues a write.
+     */
+    internal fun setClipboardText(text: String) {
+        checkOpen()
+        require(text.indexOf(NUL) < 0) { "clipboard text must not contain NUL characters" }
+        if (Thread.currentThread() === serviceThread) {
+            writeClipboard(text)
+        } else {
+            service.enqueueStateOp {
+                if (!closed.get()) {
+                    writeClipboard(text)
+                }
+            }
+        }
+    }
+
+    /** Reads the clipboard directly; requires the service thread. */
+    internal fun clipboardText(): String? {
+        checkOpen()
+        check(Thread.currentThread() === serviceThread) {
+            "clipboardText() must run on the service thread '${serviceThread.name}'; " +
+                "call requestClipboardText() and use a ClipboardListener from other threads"
+        }
+        val handle = raw
+        return if (handle == MemoryUtil.NULL) null else backend.getClipboardString(handle)
+    }
+
+    /** Reads the clipboard now and queues the result for owner-thread delivery. */
+    internal fun requestClipboardText() {
+        checkOpen()
+        if (Thread.currentThread() === serviceThread) {
+            publishClipboardText()
+        } else {
+            service.enqueueStateOp {
+                if (!closed.get()) {
+                    publishClipboardText()
+                }
+            }
+        }
+    }
+
+    internal fun addClipboardListener(listener: ClipboardListener) {
+        checkOpen()
+        inputQueue.addClipboardListener(listener)
+    }
+
+    internal fun removeClipboardListener(listener: ClipboardListener) {
+        checkOpen()
+        inputQueue.removeClipboardListener(listener)
+    }
+
+    private fun writeClipboard(text: String) {
+        val handle = raw
+        if (handle != MemoryUtil.NULL) {
+            backend.setClipboardString(handle, text)
+        }
+    }
+
+    private fun publishClipboardText() {
+        val handle = raw
+        if (handle != MemoryUtil.NULL) {
+            inputQueue.offerClipboardText(backend.getClipboardString(handle))
+        }
     }
 
     internal fun setCloseRequested(requested: Boolean) {
@@ -918,6 +988,8 @@ internal class WindowHandle private constructor(
 
         private const val MACOS_OPENGL_MAJOR: Int = 4
         private const val MACOS_OPENGL_MINOR: Int = 1
+
+        private const val NUL: Char = '\u0000'
 
         private const val MAX_CODE_POINT: Int = 0x10FFFF
         private val SURROGATE_RANGE: IntRange = 0xD800..0xDFFF

@@ -18,7 +18,7 @@ Root package: `com.psiwray.organization.terminal_window`.
 |---|---|---|
 | `com.psiwray.organization.terminal_window` | `TerminalWindow`, `TerminalWindowConfig`, `TerminalWindowService`, `GlfwOwnership`, `GlfwException`, `GlException`, `TerminalMatrix`, `ResizePolicy`, `RenderStats`, `ContextInfo`, `CursorShape`, `CursorMode`, `CursorImage`, `WindowIcon`, `Colors` | Public |
 | `...terminal_window.font` | Immutable parsed font types, font-loading entry points, and internal atlas baking | Public package; atlas types internal |
-| `...terminal_window.input` | Immutable input event types, enums, `Modifiers`, `CursorPosition` | Public |
+| `...terminal_window.input` | Immutable input event types, enums, `Modifiers`, `CursorPosition`, `ClipboardListener` | Public |
 | `...terminal_window.internal` | native GLFW backend, service-thread guard, window plumbing, input queue, frame scheduler, renderer, GL resources | Internal |
 
 Rules:
@@ -63,7 +63,7 @@ private types, but not move a type across the public/internal boundary.
 | `WindowHandle` | `.internal` | 12, 17, 25 | Raw handle ownership, context-current transfer, pending framebuffer/content-scale application, cursor/icon state, close flag, and queued destruction |
 | `CursorHandle` | `.internal` | 25 | Service-thread cursor creation, caching, and destruction |
 | `ImageLoader` | `.internal` | 25 | stb_image decoding and ARGB conversion for icons and cursors |
-| `InputQueue` | `.internal` | 13 | One per window; bounded discrete queue plus coalesced move, cursor-enter, and window-state slots; listener dispatch |
+| `InputQueue` | `.internal` | 13 | One per window; bounded discrete queue plus coalesced move, cursor-enter, and window-state slots; clipboard result queue; listener dispatch |
 | `DeviceState` | `.internal` | 13 | Immutable service-thread key, mouse-button, and cursor snapshot for direct queries |
 | `TerminalMatrix` | root | 10 | Flat cell arrays, mutation, dirty tracking |
 | `ResizePolicy` | root | 10 | `PRESERVE_TOP_LEFT` or `CLEAR` resize behavior |
@@ -83,9 +83,9 @@ release them explicitly.
 
 | Thread | Calls | Never calls |
 |---|---|---|
-| Service thread | `glfwInit`, `glfwTerminate`, window create/destroy, `glfwPollEvents`, window registry, per-window queues, window state get/set, `glfwGetFramebufferSize`, `glfwGetKey`, `glfwGetMouseButton`, `glfwGetCursorPos`, callbacks (except error) | GL functions belonging to any window context |
-| Owner thread (one per window) | `glfwMakeContextCurrent`, all GL commands, buffer upload, draw, `glfwSwapBuffers`, `glfwSwapInterval`, draining its own input queue, listener callbacks | Any GLFW window or event function; another window's queue |
-| Application threads | Cell writes, `forceRepaint` / `requestRepaint()` controls, state setters, direct input-state reads, listener add/remove | GLFW, GL, direct listener dispatch, or direct mutation of renderer state |
+| Service thread | `glfwInit`, `glfwTerminate`, window create/destroy, `glfwPollEvents`, window registry, per-window queues, window state get/set, `glfwGetFramebufferSize`, `glfwGetKey`, `glfwGetMouseButton`, `glfwGetCursorPos`, `glfwGetClipboardString`, `glfwSetClipboardString`, callbacks (except error) | GL functions belonging to any window context |
+| Owner thread (one per window) | `glfwMakeContextCurrent`, all GL commands, buffer upload, draw, `glfwSwapBuffers`, `glfwSwapInterval`, draining its own input queue, listener and clipboard-listener callbacks | Any GLFW window or event function; another window's queue |
+| Application threads | Cell writes, `forceRepaint` / `requestRepaint()` controls, state setters, direct input-state reads, listener add/remove, clipboard writes and clipboard read requests | GLFW, GL, direct listener dispatch, or direct mutation of renderer state |
 
 The service thread is the process main thread and the thread that calls
 `glfwInit`. Context transfer between threads is explicit; see ADR-0004.

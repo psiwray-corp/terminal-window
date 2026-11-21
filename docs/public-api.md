@@ -13,7 +13,7 @@ The public surface is limited to three packages:
 |---|---|
 | `com.psiwray.organization.terminal_window` | `TerminalWindow`, `TerminalWindowConfig`, `TerminalWindowService`, `GlfwOwnership`, `TerminalMatrix`, `RenderStats`, `ContextInfo`, `Colors`, `ResizePolicy`, `CursorShape`, `CursorMode`, `CursorImage`, `WindowIcon`, `GlException`, `GlfwException` |
 | `...terminal_window.font` | `BitmapFont`, `FontFormatException` |
-| `...terminal_window.input` | `InputEvent` and its subtypes, `InputListener`, `Key`, `MouseButton`, `Modifiers`, `KeyAction`, `CursorPosition` |
+| `...terminal_window.input` | `InputEvent` and its subtypes, `InputListener`, `ClipboardListener`, `Key`, `MouseButton`, `Modifiers`, `KeyAction`, `CursorPosition` |
 
 Everything in `...terminal_window.internal` is implementation. Font atlas
 types are internal even though they share the public `.font` package.
@@ -80,6 +80,11 @@ take effect at the next service-thread pump.
 | `WindowIcon.of`, `WindowIcon.fromPath`, `copyPixels` | Any | Immutable icon construction and copy; `fromPath` uses stb_image. |
 | `CursorShape`, `CursorMode` values | Any | Enums; GLFW codes are internal. |
 | `TerminalWindow.addInputListener` / `removeInputListener` | Any | Listener callbacks themselves run on the owner thread. |
+| `TerminalWindow.setClipboardText` | Any | Immediate on the service thread; queued from any other thread. NUL characters are rejected. |
+| `TerminalWindow.clipboardText` | Service | Calls `glfwGetClipboardString` on the caller; `null` when the clipboard holds no text. |
+| `TerminalWindow.requestClipboardText` | Any | Immediate on the service thread; queued otherwise. The result is delivered on the owner thread. |
+| `TerminalWindow.addClipboardListener` / `removeClipboardListener` | Any | Callbacks run on the owner thread when the frame pipeline drains input. |
+| `ClipboardListener.onClipboardText` | Owner | Called once per completed clipboard read, in request order. |
 | `TerminalWindow.isKeyPressed`, `isMouseButtonPressed`, `cursorPosition` | Any | Read the latest service-thread snapshot; no GLFW calls. |
 | `TerminalWindow.frame` | Service or owner | Calls GL and requires the window context current on the caller. In multi-threaded mode the owner thread calls it. |
 | `TerminalWindow.renderStats` | Any | Returns the last immutable snapshot. |
@@ -113,8 +118,10 @@ a context current on two threads.
 ## Nullability
 
 Kotlin non-null is the default. `require` / `requireNotNull` validate values that
-Java callers can supply as null; library code contains no `!!`. The only public
-nullable return in 2.0 is `BitmapFont.fallbackCodePoint: Int?`.
+Java callers can supply as null; library code contains no `!!`. The public
+nullable returns are `BitmapFont.fallbackCodePoint: Int?` and
+`TerminalWindow.clipboardText(): String?`; `ClipboardListener.onClipboardText`
+takes a nullable parameter.
 
 ## Exceptions
 

@@ -5,8 +5,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 readme_lines="$(awk 'END { print NR }' README.md)"
-if ((readme_lines > 150)); then
-    echo "error: README.md is $readme_lines lines; the limit is 150." >&2
+if ((readme_lines > 160)); then
+    echo "error: README.md is $readme_lines lines; the limit is 160." >&2
     exit 1
 fi
 

@@ -90,6 +90,15 @@ internal interface GlfwBackend {
         icons: List<WindowIcon>,
     )
 
+    /** Reads the UTF-8 clipboard text; null when the clipboard holds no text. */
+    fun getClipboardString(window: Long): String?
+
+    /** Writes [text] to the clipboard. */
+    fun setClipboardString(
+        window: Long,
+        text: String,
+    )
+
     fun createStandardCursor(shape: Int): Long
 
     fun createCursor(
